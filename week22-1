@@ -1,0 +1,86 @@
+--使用する権限：sysadmin
+use role sysadmin;
+--使用するwarehouse:frostyfriday_wh
+use warehouse frostyfriday_wh;
+
+--databaseとschemaの作成
+create or replace database frosty_week22;
+create or replace schema frosty_schema;
+
+
+-- -- CSVを読み込むためのファイルフォーマットを作成
+create or replace file format frosty_csv
+    type = csv
+    field_delimiter = ','
+    field_optionally_enclosed_by = '"'
+    skip_header = 1;
+    
+-- CSVを読み込むためのステージを作成
+create or replace stage w22_frosty_stage
+  url = 's3://frostyfridaychallenges/challenge_22/'
+  file_format = frosty_csv;
+
+--使用するロール：securityadmin
+use role securityadmin;
+  
+--必要なロールを作成
+create  role rep1; --奇数
+create  role rep2; --偶数
+
+
+-- テスト用のロールを自身に付与
+grant  role rep1 to user FROSTYWEEK22;
+grant  role rep2 to user FROSTYWEEK22;
+
+
+--使用するロール：sysadmin
+use role sysadmin;
+
+--warehouseの権限を付与
+grant usage on warehouse frostyfriday_wh to role rep1;
+grant usage on warehouse frostyfriday_wh to role rep2;
+
+-- S3にあるCSVからテーブルを作成
+create or replace table frosty_week22.frosty_schema.week22 as
+select t.$1::int id, t.$2::varchar(50) city, t.$3::int district from @w22_frosty_stage (pattern=>'.*sales_areas.*') t;
+
+--select * from week22where id % 2 = 0;
+
+-- Secure viewを作成
+-- Row Access Policyを作成
+create or replace row access policy id_row_policy
+  as (id int) returns boolean ->
+  (id % 2 = 1 and current_role() = 'REP1') or
+  (id % 2 = 0 and current_role() = 'REP2');
+
+ 
+-- Row Access Policyをテーブルに適用
+alter table frosty_week22.frosty_schema.week22
+  add row access policy id_row_policy on (id);
+
+-- Secure viewを作成し、IDをUUIDに変換
+create or replace secure view frosty_week22.frosty_schema.secure_cities as
+select uuid_string() as id, city, district
+from frosty_week22.frosty_schema.week22;
+  
+    
+-- ロールにDBアクセス権限を付与
+grant usage on database frosty_week22 to role rep1;
+grant usage on database frosty_week22 to role rep2;
+-- スキーマへのアクセス権限を付与
+grant usage on schema frosty_week22.frosty_schema to role rep1;
+grant usage on schema frosty_week22.frosty_schema to role rep2;
+-- Viewへの権利付与
+grant select on view frosty_week22.frosty_schema.secure_cities to role rep1;
+grant select on view frosty_week22.frosty_schema.secure_cities to role rep2;
+
+--クエリの結果を取得
+use role rep1;
+select * from frosty_week22.frosty_schema.secure_cities;
+
+
+grant select on table FROSTY_WEEK22.FROSTY_SCHEMA.WEEK22 to role rep1;
+select * from frosty_week22.frosty_schema.week22;
+
+use role rep2;
+select * from frosty_week22.frosty_schema.secure_cities;
