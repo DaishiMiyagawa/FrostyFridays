@@ -1,0 +1,62 @@
+--warehouseの作成
+CREATE OR REPLACE WAREHOUSE frosty
+  WAREHOUSE_SIZE = 'XSMALL'
+  AUTO_SUSPEND = 300
+  AUTO_RESUME = TRUE
+  INITIALLY_SUSPENDED = TRUE;
+
+  --database,schemaの作成  
+CREATE OR REPLACE DATABASE frosty_friday;
+CREATE OR REPLACE SCHEMA frosty_friday.ff_week45;
+
+  
+
+CREATE OR REPLACE TABLE website_clicks (
+    id INTEGER,
+    user_id INTEGER,
+    page_url STRING,
+    click_time TIMESTAMP,
+    click_location STRING
+);
+
+INSERT INTO website_clicks VALUES (1, 101, 'https://www.example.com/home', '2023-05-12 08:00:00', '<div id="header" class="header">');
+INSERT INTO website_clicks VALUES (2, 102, 'https://www.example.com/products', '2023-05-12 08:05:00', '<main class="content">');
+INSERT INTO website_clicks VALUES (3, 101, 'https://www.example.com/about', '2023-05-12 08:10:00', '<footer class="site-footer">');
+INSERT INTO website_clicks VALUES (4, 103, 'https://www.example.com/home', '2023-05-12 08:15:00', '<section class="main-content">');
+INSERT INTO website_clicks VALUES (5, 102, 'https://www.example.com/contact', '2023-05-12 08:20:00', '<header class="site-header">');
+
+
+select *
+from website_clicks;
+
+--内部ステージの作成
+CREATE STAGE IF NOT EXISTS my_udf_stage;
+
+--Pythonファイルのアップロード
+--GUI
+
+--ステージ上の確認
+LIST @my_udf_stage;
+
+
+--ステージにロードしたpyファイルを元にUDF作成
+CREATE OR REPLACE FUNCTION extract_class_value(input_string STRING)
+RETURNS STRING
+LANGUAGE PYTHON
+RUNTIME_VERSION = '3.9'
+HANDLER = 'udf.extract_class_value'
+IMPORTS = ('@my_udf_stage/udf.py');
+
+
+--UDFを使用したデータ処理
+SELECT 
+    id,
+    user_id,
+    page_url,
+    click_time,
+    click_location,
+    extract_class_value(click_location) AS element_class
+FROM website_clicks;
+
+
+
