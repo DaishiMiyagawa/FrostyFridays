@@ -1,0 +1,23 @@
+--SQL文の中に直接Pythonコードを記述
+CREATE OR REPLACE FUNCTION extract_class_value(input_string STRING)
+RETURNS STRING
+LANGUAGE PYTHON
+RUNTIME_VERSION = '3.9'
+HANDLER = 'extract_class_value'
+AS
+$$
+import re
+def extract_class_value(input_string):
+    match = re.search('class="([^"]*)"', input_string)
+    return match.group(1) if match else None
+$$;
+
+--アウトプットの確認
+SELECT 
+    id,
+    user_id,
+    page_url,
+    click_time,
+    click_location,
+    extract_class_value(click_location) AS element_class
+FROM website_clicks;a
