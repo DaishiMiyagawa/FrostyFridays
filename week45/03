@@ -1,0 +1,8 @@
+-- クラス名を抽出するSQLだけでの実装
+SELECT
+  id,
+  user_id,
+  page_url,
+  click_time,
+  REGEXP_SUBSTR(click_location, 'class="([^"]*)"', 1, 1, 'e', 1) AS click_location
+FROM website_clicks;
